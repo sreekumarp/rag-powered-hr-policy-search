@@ -54,6 +54,28 @@ class Config:
     CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", 0.3))
     MIN_CONFIDENCE_FOR_ANSWER = float(os.environ.get("MIN_CONFIDENCE", 0.5))
 
+    # === LLM Configuration ===
+    LLM_ENABLED = os.environ.get("LLM_ENABLED", "true").lower() == "true"
+
+    # GitHub Models
+    GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+    GITHUB_MODELS_ENDPOINT = os.environ.get(
+        "GITHUB_MODELS_ENDPOINT",
+        "https://models.inference.ai.azure.com"
+    )
+    GITHUB_MODELS_MODEL = os.environ.get("GITHUB_MODELS_MODEL", "gpt-4o-mini")
+    GITHUB_MODELS_MAX_TOKENS = int(os.environ.get("GITHUB_MODELS_MAX_TOKENS", 500))
+    GITHUB_MODELS_TEMPERATURE = float(os.environ.get("GITHUB_MODELS_TEMPERATURE", 0.1))
+
+    # Caching
+    LLM_CACHE_ENABLED = os.environ.get("LLM_CACHE_ENABLED", "true").lower() == "true"
+    LLM_CACHE_TTL = int(os.environ.get("LLM_CACHE_TTL", 86400))  # 24 hours
+    LLM_CACHE_SIMILARITY = float(os.environ.get("LLM_CACHE_SIMILARITY", 0.92))
+
+    # Features
+    LLM_ENABLE_CITATIONS = os.environ.get("LLM_ENABLE_CITATIONS", "true").lower() == "true"
+    LLM_FALLBACK_TO_TEMPLATE = os.environ.get("LLM_FALLBACK_TO_TEMPLATE", "true").lower() == "true"
+
     # Logging
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
     LOG_DIR = os.environ.get("LOG_DIR", "logs")

@@ -1,5 +1,6 @@
 """Admin API routes for system management."""
 
+from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app
 from middleware.auth import jwt_required, permission_required, get_current_user
 from middleware.rate_limiter import rate_limit
@@ -219,3 +220,97 @@ def get_config():
         ),
         200,
     )
+
+
+# === LLM Statistics & Management ===
+
+@admin_bp.route("/llm/stats", methods=["GET"])
+@jwt_required
+@permission_required("admin")
+def llm_statistics():
+    """
+    Get LLM usage statistics.
+
+    Returns:
+        JSON with GitHub Models usage, cache stats, rate limits
+    """
+    llm_service = current_app.config.get("LLM_SERVICE")
+    response_cache = current_app.config.get("RESPONSE_CACHE")
+
+    if not llm_service:
+        return jsonify({"error": "LLM service not enabled"}), 400
+
+    # Get LLM stats
+    llm_stats = llm_service.get_statistics()
+
+    # Get cache stats
+    cache_stats = {}
+    if response_cache:
+        cache_stats = response_cache.get_statistics()
+
+    return jsonify({
+        "llm": llm_stats,
+        "cache": cache_stats,
+        "config": {
+            "model": current_app.config.get("GITHUB_MODELS_MODEL"),
+            "endpoint": current_app.config.get("GITHUB_MODELS_ENDPOINT"),
+            "max_tokens": current_app.config.get("GITHUB_MODELS_MAX_TOKENS"),
+            "temperature": current_app.config.get("GITHUB_MODELS_TEMPERATURE"),
+        }
+    }), 200
+
+@admin_bp.route("/llm/cache/clear", methods=["POST"])
+@jwt_required
+@permission_required("admin")
+def clear_llm_cache():
+    """Clear LLM response cache."""
+    response_cache = current_app.config.get("RESPONSE_CACHE")
+
+    if not response_cache:
+        return jsonify({"error": "Cache not enabled"}), 400
+
+    response_cache.clear()
+
+    return jsonify({
+        "message": "LLM cache cleared successfully",
+        "timestamp": datetime.utcnow().isoformat()
+    }), 200
+
+@admin_bp.route("/llm/test", methods=["POST"])
+@jwt_required
+@permission_required("admin")
+def test_llm():
+    """
+    Test LLM connection with simple query.
+
+    Request body:
+        {
+            "test_query": "Say hello"  # optional
+        }
+    """
+    llm_service = current_app.config.get("LLM_SERVICE")
+
+    if not llm_service:
+        return jsonify({"error": "LLM service not enabled"}), 400
+
+    data = request.get_json() or {}
+    test_prompt = data.get("test_query", "Say 'Hello from GitHub Models!' in exactly one sentence.")
+
+    try:
+        import time
+        start = time.time()
+        response, metadata = llm_service.generate(test_prompt, max_tokens=50)
+        latency = (time.time() - start) * 1000
+
+        return jsonify({
+            "status": "success",
+            "response": response,
+            "metadata": metadata,
+            "latency_ms": round(latency, 2)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
