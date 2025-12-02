@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m pip:*)",
+      "Bash(python3 -m site:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(export PORT=5001)",
+      "Bash(python app.py:*)",
+      "Bash(curl:*)",
+      "Bash(chmod:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker logs:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

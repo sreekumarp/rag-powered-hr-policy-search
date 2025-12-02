@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (Production)
+  postgres:
+    image: postgres:16-alpine
+    container_name: hr_assistant_db
+    environment:
+      POSTGRES_USER: hr_assistant
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: hr_assistant
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hr_assistant"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hr_network
+
+  # Redis (Optional - for distributed rate limiting)
+  redis:
+    image: redis:7-alpine
+    container_name: hr_assistant_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hr_network
+
+  # HR Assistant API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hr_assistant_api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - PORT=51425
+      - SECRET_KEY=${SECRET_KEY:-changeme-secret-key}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-changeme-jwt-key}
+      - DATABASE_URL=postgresql://hr_assistant:${POSTGRES_PASSWORD:-changeme}@postgres:5432/hr_assistant
+      - RATE_LIMIT_STORAGE_URL=redis://redis:6379
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+    volumes:
+      - hr_data:/app/data
+      - hr_uploads:/app/uploads
+      - hr_logs:/app/logs
+    ports:
+      - "${PORT:-51425}:51425"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:51425/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hr_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  hr_data:
+    driver: local
+  hr_uploads:
+    driver: local
+  hr_logs:
+    driver: local
+
+networks:
+  hr_network:
+    driver: bridge

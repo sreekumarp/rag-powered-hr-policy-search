@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+eggs/
+.eggs/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Data (persist index but exclude temp files)
+data/*.faiss
+data/*.pkl
+data/*.json
+!data/sample_faq.txt
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# Logs
+logs/*.log
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Model cache
+.cache/
