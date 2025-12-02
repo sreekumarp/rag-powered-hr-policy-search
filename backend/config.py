@@ -64,7 +64,7 @@ class Config:
         "https://models.inference.ai.azure.com"
     )
     GITHUB_MODELS_MODEL = os.environ.get("GITHUB_MODELS_MODEL", "gpt-4o-mini")
-    GITHUB_MODELS_MAX_TOKENS = int(os.environ.get("GITHUB_MODELS_MAX_TOKENS", 500))
+    GITHUB_MODELS_MAX_TOKENS = int(os.environ.get("GITHUB_MODELS_MAX_TOKENS", 1500))  # Increased for more detailed responses
     GITHUB_MODELS_TEMPERATURE = float(os.environ.get("GITHUB_MODELS_TEMPERATURE", 0.1))
 
     # Caching

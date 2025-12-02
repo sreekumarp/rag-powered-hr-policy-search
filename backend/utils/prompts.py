@@ -19,15 +19,17 @@ class PromptBuilder:
 CRITICAL RULES:
 1. Answer ONLY using information from the provided context
 2. Cite sources using [Source N] notation when referencing information
-3. If the context doesn't contain the answer, clearly state this
-4. Be concise but thorough
+3. Provide COMPLETE and DETAILED answers - don't cut short
+4. Include all relevant details, procedures, and requirements
 5. Use professional, friendly tone
 6. If information is ambiguous or conflicting, mention it
+7. Structure your response with clear paragraphs for readability
 
 DO NOT:
 - Invent or assume information not in the context
 - Provide personal opinions or advice beyond stated policies
-- Reference external sources or general knowledge"""
+- Reference external sources or general knowledge
+- Give incomplete or truncated answers"""
 
     @staticmethod
     def build_rag_prompt(
@@ -78,7 +80,13 @@ EMPLOYEE QUESTION:
 
 ---
 INSTRUCTIONS:
-Based solely on the context above, provide a clear and helpful answer. {citation_note}
+Based solely on the context above, provide a COMPREHENSIVE and DETAILED answer. {citation_note}
+
+- Include ALL relevant information from the context
+- Explain procedures, requirements, and conditions fully
+- Use multiple paragraphs if needed for clarity
+- Provide specific examples or scenarios when available
+- Don't summarize - give complete details
 
 If the context doesn't contain sufficient information to answer the question, respond with:
 "I don't have enough information in the available HR policies to fully answer this question. Please contact HR directly for clarification."
