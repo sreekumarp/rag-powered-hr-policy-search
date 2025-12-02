@@ -128,8 +128,6 @@ curl http://localhost:5001/api/analytics \
 
 ### Postman
 
-### Query Screenshot
-
 1. **Query 1**
 ![Query example](query1.png)
 
