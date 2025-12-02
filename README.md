@@ -125,3 +125,13 @@ curl -X POST http://localhost:5001/api/query \
 curl http://localhost:5001/api/analytics \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+### Postman
+
+### Query Screenshot
+
+1. **Query 1**
+![Query example](query1.png)
+
+2. **Query 2**
+![Query example](query2.png)
