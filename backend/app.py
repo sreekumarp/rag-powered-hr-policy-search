@@ -59,14 +59,49 @@ def create_app(config_name=None):
     )
     app.config["VECTOR_STORE"] = vector_store
 
-    # Initialize RAG Service
+    # Initialize LLM Service
+    logger.info("Initializing LLM Service (GitHub Models)...")
+
+    llm_config = {
+        "LLM_ENABLED": app.config.get("LLM_ENABLED", True),
+        "GITHUB_TOKEN": app.config.get("GITHUB_TOKEN", ""),
+        "GITHUB_MODELS_ENDPOINT": app.config.get("GITHUB_MODELS_ENDPOINT"),
+        "GITHUB_MODELS_MODEL": app.config.get("GITHUB_MODELS_MODEL"),
+        "GITHUB_MODELS_MAX_TOKENS": app.config.get("GITHUB_MODELS_MAX_TOKENS"),
+        "GITHUB_MODELS_TEMPERATURE": app.config.get("GITHUB_MODELS_TEMPERATURE"),
+        "LLM_FALLBACK_TO_TEMPLATE": app.config.get("LLM_FALLBACK_TO_TEMPLATE", True),
+    }
+
+    from services.llm_service import LLMService
+    llm_service = LLMService(llm_config) if app.config.get("LLM_ENABLED", True) else None
+    app.config["LLM_SERVICE"] = llm_service
+
+    # Initialize Response Cache (if enabled)
+    response_cache = None
+    if app.config.get("LLM_CACHE_ENABLED", True) and llm_service:
+        logger.info("Initializing Response Cache...")
+        from utils.cache import ResponseCache
+        response_cache = ResponseCache(
+            embedding_model=vector_store.embedding_model,
+            similarity_threshold=app.config.get("LLM_CACHE_SIMILARITY", 0.92),
+            default_ttl=app.config.get("LLM_CACHE_TTL", 86400),
+            max_size=500,
+            cache_file="data/llm_cache.json"
+        )
+        app.config["RESPONSE_CACHE"] = response_cache
+
+    # Initialize RAG Service (with LLM and cache)
     logger.info("Initializing RAG Service...")
     rag_service = RAGService(
         vector_store=vector_store,
+        llm_service=llm_service,
+        cache=response_cache,
         config={
             "retrieval_k": app.config["RETRIEVAL_K"],
             "confidence_threshold": app.config["CONFIDENCE_THRESHOLD"],
             "min_confidence_for_answer": app.config["MIN_CONFIDENCE_FOR_ANSWER"],
+            "enable_llm": app.config.get("LLM_ENABLED", True),
+            "enable_citations": app.config.get("LLM_ENABLE_CITATIONS", True),
         },
     )
     app.config["RAG_SERVICE"] = rag_service

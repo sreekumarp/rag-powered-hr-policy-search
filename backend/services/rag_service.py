@@ -11,21 +11,27 @@ from utils.rag_pipeline import RAGPipeline
 class RAGService:
     """Service for RAG operations with analytics and logging."""
 
-    def __init__(self, vector_store, config=None):
+    def __init__(self, vector_store, llm_service=None, cache=None, config=None):
         """
         Initialize RAG service.
 
         Args:
             vector_store: Vector store instance
+            llm_service: LLM service instance (optional)
+            cache: Response cache instance (optional)
             config: Configuration dict
         """
         config = config or {}
 
         self.pipeline = RAGPipeline(
             vector_store=vector_store,
+            llm_service=llm_service,
+            cache=cache,
             retrieval_k=config.get("retrieval_k", 3),
             confidence_threshold=config.get("confidence_threshold", 0.3),
             min_confidence_for_answer=config.get("min_confidence_for_answer", 0.5),
+            enable_llm=config.get("enable_llm", True),
+            enable_citations=config.get("enable_citations", True),
         )
 
     def query(self, question, filters=None, include_low_confidence=False, user_id=None):

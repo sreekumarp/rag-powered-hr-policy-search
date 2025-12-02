@@ -13,6 +13,9 @@ from typing import Dict, List, Optional
 from datetime import datetime
 from utils.vector_store import VectorStore
 from utils.logger import log_query, log_error, logger
+from services.llm_service import LLMService
+from utils.prompts import PromptBuilder
+from utils.cache import ResponseCache
 
 
 class RAGPipeline:
@@ -21,28 +24,41 @@ class RAGPipeline:
     def __init__(
         self,
         vector_store: VectorStore,
+        llm_service: LLMService = None,
+        cache: ResponseCache = None,
         retrieval_k: int = 3,
         confidence_threshold: float = 0.3,
         min_confidence_for_answer: float = 0.5,
+        enable_llm: bool = True,
+        enable_citations: bool = True,
     ):
         """
         Initialize the RAG pipeline.
 
         Args:
             vector_store: VectorStore instance
+            llm_service: LLM service instance (optional)
+            cache: Response cache instance (optional)
             retrieval_k: Number of documents to retrieve
             confidence_threshold: Minimum score to consider relevant
             min_confidence_for_answer: Minimum confidence to provide answer
+            enable_llm: Whether to use LLM for generation
+            enable_citations: Whether to include source citations
         """
         self.vector_store = vector_store
+        self.llm_service = llm_service
+        self.cache = cache
         self.retrieval_k = retrieval_k
         self.confidence_threshold = confidence_threshold
         self.min_confidence_for_answer = min_confidence_for_answer
+        self.enable_llm = enable_llm
+        self.enable_citations = enable_citations
 
         # Query statistics
         self.query_count = 0
         self.total_latency_ms = 0
         self.average_confidence = 0
+        self.llm_usage_count = 0
 
     def query(
         self,
@@ -114,7 +130,11 @@ class RAGPipeline:
         context = "\n\n".join(context_parts)
 
         # Generate response
-        answer = self._generate_response(question, context, relevant_docs)
+        response_data = self._generate_response(question, context, relevant_docs)
+
+        # Extract answer and metadata
+        answer = response_data["answer"]
+        llm_metadata = response_data.get("metadata", {})
 
         # Calculate confidence
         avg_confidence = sum(score for _, score in relevant_docs) / len(relevant_docs)
@@ -147,18 +167,111 @@ class RAGPipeline:
             "processing_time_ms": round(latency_ms, 2),
             "timestamp": datetime.utcnow().isoformat(),
             "warnings": warnings,
+            "llm_metadata": llm_metadata,  # NEW: includes provider, cached status, etc.
         }
 
         return result
 
     def _generate_response(
         self, question: str, context: str, docs: List
-    ) -> str:
-        """Generate a response based on retrieved context."""
+    ) -> Dict:
+        """
+        Generate response using LLM or template fallback.
+
+        Args:
+            question: User's question
+            context: Concatenated context (for backward compatibility)
+            docs: List of (document, score) tuples
+
+        Returns:
+            Dict with 'answer' and 'metadata'
+        """
+        # Check cache first
+        if self.cache:
+            cached = self.cache.get(question)
+            if cached:
+                logger.info("Cache hit! Returning cached response")
+                if self.llm_service:
+                    self.llm_service.cache_hits += 1
+                return cached
+
+        # Try LLM generation
+        if self.enable_llm and self.llm_service:
+            try:
+                response_data = self._llm_generate_response(question, docs)
+                self.llm_usage_count += 1
+
+                # Cache the response
+                if self.cache and response_data["metadata"].get("provider") == "github-models":
+                    self.cache.set(
+                        query=question,
+                        response=response_data["answer"],
+                        metadata=response_data["metadata"]
+                    )
+
+                return response_data
+
+            except Exception as e:
+                logger.error(f"LLM generation failed: {e}")
+                # Fall through to template
+
+        # Template fallback
+        return self._template_generate_response(question, context, docs)
+
+    def _llm_generate_response(self, question: str, docs: List) -> Dict:
+        """
+        Generate response using LLM (GitHub Models).
+
+        Args:
+            question: User question
+            docs: Retrieved documents with scores
+
+        Returns:
+            Dict with answer and metadata
+        """
+        # Prepare contexts for prompt
+        contexts = [
+            {
+                "text": doc["text"],
+                "source": doc.get("source", "unknown"),
+                "relevance_score": score,
+            }
+            for doc, score in docs
+        ]
+
+        # Build optimized prompt
+        prompt = PromptBuilder.build_rag_prompt(
+            question=question,
+            contexts=contexts,
+            enable_citations=self.enable_citations
+        )
+
+        # Generate with LLM
+        answer, metadata = self.llm_service.generate(prompt)
+
+        logger.info(f"LLM generated response (provider: {metadata.get('provider')})")
+
+        return {
+            "answer": answer,
+            "metadata": metadata
+        }
+
+    def _template_generate_response(self, question: str, context: str, docs: List) -> Dict:
+        """
+        Template-based response generation (original fallback).
+
+        Args:
+            question: User question
+            context: Concatenated context text
+            docs: Retrieved documents
+
+        Returns:
+            Dict with answer and metadata
+        """
         best_doc, best_score = docs[0]
         text = best_doc["text"]
 
-        # Try to extract Q&A pairs
+        # Try Q&A extraction (original logic)
         if "Q:" in text and "A:" in text:
             qa_pairs = text.split("Q:")
             for qa in qa_pairs:
@@ -166,22 +279,29 @@ class RAGPipeline:
                     parts = qa.split("A:", 1)
                     if len(parts) == 2:
                         q_part = parts[0].strip()
-                        a_part = parts[1].strip().split("\n\n")[0]  # Get first paragraph
-                        # Check relevance
+                        a_part = parts[1].strip().split("\n\n")[0]
+
+                        # Simple word overlap matching
                         if any(
                             word.lower() in q_part.lower()
                             for word in question.split()
                             if len(word) > 3
                         ):
-                            return f"Based on HR policies:\n\n{a_part}"
+                            return {
+                                "answer": f"Based on HR policies:\n\n{a_part}",
+                                "metadata": {"provider": "template", "cached": False}
+                            }
 
-        # Default response
+        # Default: return first chunk
         response = f"Based on the HR policies, here's relevant information:\n\n{text}"
 
         if len(docs) > 1:
-            response += f"\n\n---\nFound {len(docs)} relevant sections. Check sources below for complete information."
+            response += f"\n\n---\nFound {len(docs)} relevant sections. See sources for complete information."
 
-        return response
+        return {
+            "answer": response,
+            "metadata": {"provider": "template", "cached": False}
+        }
 
     def _empty_response(
         self, question: str, start_time: float, filters: Dict = None

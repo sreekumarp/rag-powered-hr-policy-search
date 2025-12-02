@@ -29,7 +29,7 @@ transformers==4.35.2
 # huggingface_hub<0.17  # Install after: pip install 'huggingface_hub<0.17'
 
 # Vector Store
-faiss-cpu==1.7.4
+faiss-cpu==1.12.0
 numpy==1.26.2
 
 # Document Processing
@@ -45,6 +45,10 @@ python-dateutil==2.8.2
 
 # Logging & Monitoring
 colorlog==6.8.0
+
+# LLM Integration - GitHub Models
+openai==1.12.0          # GitHub Models uses OpenAI-compatible API
+tiktoken==0.6.0         # Token counting
 
 # Testing
 pytest==7.4.3
