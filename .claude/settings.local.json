@@ -12,7 +12,9 @@
       "Bash(docker-compose down:*)",
       "Bash(docker-compose up:*)",
       "Bash(docker logs:*)",
-      "Bash(pip3 install:*)"
+      "Bash(pip3 install:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker-compose ps:*)"
     ],
     "deny": [],
     "ask": []
